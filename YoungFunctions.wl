@@ -1,11 +1,12 @@
 (* ::Package:: *)
 
-BeginPackage["YoungFunctions`"];
+(*Version 06/20/2024*)
+
+
+BeginPackage["YoungFunctions`",{"QCFunctions`"}];(*publicly load QCFunctions as well*)
 
 
 Needs["Combinatorica`"]
-Needs["Combinatorica`"]
-Needs["QCFunctions"]
 
 
 (* ::Title:: *)
@@ -140,8 +141,7 @@ Grow[length_,max_,YT_](*Start from a YT, grow bigger by one tow*):=
 (Append[YT,#])&/@NewRows[length,max,LastRow[YT](*last row*)]
 
 Grows[length_,max_,YTs_(*list of YTs*)]:=Flatten[Map[Grow[length,max,#]&,YTs],1]
-
-WT[YD_,N_]:=Fold[Grows[#2,N,#]&,{{}},YD]
+WT[YD_,N_]:=SortBy[Fold[Grows[#2,N,#]&,{{}},YD],Reverse@*Flatten](*Weyl Tableaux, ordering is a bit diff from the G-T ordering*)
 
 
 (* ::Subchapter:: *)
@@ -154,7 +154,7 @@ InversePermute[x___]:=System`Permute[First[{x}],System`InversePermutation@Last[{
 Acti[unit_,basis_](*inverse permute*):=TensorExpand[basis\[TensorProduct]unit]/.TensorProduct->InversePermute
 Act[unit_,basis_]:=TensorExpand[basis\[TensorProduct]unit]/.TensorProduct->System`Permute
 (*get basis from tableau*)
-Tensor[Weyl_]:=Apply[e,Flatten[Flatten[Weyl,{{2},{1}}](*ragged transpose!!*)]]
+Tensor[YT_,WT_]:=Apply[e,Permute[Flatten[WT],Flatten[YT]](*ragged transpose!!*)]
 
 
 repMatrix[unit_]:=Outer[BraKet,TensorBases[2,3],Act[unit,#]&/@TensorBases[2,3]]
@@ -163,26 +163,49 @@ repMatrix[unit_]:=Outer[BraKet,TensorBases[2,3],Act[unit,#]&/@TensorBases[2,3]]
 repComp[vec_](*components*):= BraKet[vec , #] & /@ TensorBases[2, 3]
 
 
-(*Generate representation matrix in computational basis*)TensorRepMatrix[n_,Matrix_]:=Nest[TPM[Matrix,#]&,Matrix,n]
-
-
 (* ::Subsection:: *)
 (*\:4f8b\:5b50\:ff1a\:597d\:57fa*)
-
-
-fullbasis(*U\:5206\:584a\:57fa*)=({1,-1}(Act[BasisE[{{1,2},{3}}],#]&/@(Tensor/@WT[{2,1},2])))~Join~
-( (Act[BasisE[{{1,3},{2}}],#]&/@(Tensor/@WT[{2,1},2])))~Join~
-(Act[BasisE[{{1,2,3}}],#]&/@(Tensor/@WT[{3},2]))~Join~
-(Act[BasisE[{{1},{2},{3}}],#]&/@(Tensor/@WT[{1,1,1},2]));
 
 
 normalize[vector_]:=vector/Sqrt[BraKet[vector,vector]]
 
 
-(B3(*change of coordinate matrix*)=Outer[BraKet,TensorBases[2,3],normalize/@fullbasis])//MatrixForm
+fullbasisN2M2(*U,S \:5206\:584a\:57fa*)=(*[2]*)((Act[BasisE[{{1, 2}}], #] & /@ (Tensor[{{1, 2}}, #] & /@ WT[{2}, 2])))~Join~
+  (*[1,1]*)( (Act[BasisE[{{1}, {2}}], #] & /@ (Tensor[{{1}, {2}}, #] & /@ WT[{1, 1}, 2])))
+
+
+(BN2M2(*change of coordinate matrix*)=Outer[BraKet,TensorBases[2,2],normalize/@fullbasisN2M2])
+
+
+fullbasisN2M3(*U,S \:5206\:584a\:57fa*)=(*[2]*)((Act[BasisE[{{1,2}}],#]&/@(Tensor[{{1, 2}}, #] & /@ WT[{2},3])))~Join~
+(*[1,1]*)(Act[BasisE[{{1},{2}}],#]&/@(Tensor[{{1},{2}}, #] & /@ WT[{1,1},3]))
+
+
+(BN2M3(*change of coordinate matrix*)=Outer[BraKet,TensorBases[3,2],normalize/@fullbasisN2M3])
+
+
+fullbasisN3M2(*U,S \:5206\:584a\:57fa*)=(*[2,1] 1*)((Act[BasisE[t1],#]&/@(Tensor[t1, #] & /@WT[{2,1},2])))~Join~
+(*[2,1] 2*)( (Act[BasisE[t2],#]&/@(Tensor[t2, #] & /@WT[{2,1},2])))~Join~
+(*[3]*)(Act[BasisE[{{1,2,3}}],#]&/@(Tensor[{{1,2,3}}, #] & /@WT[{3},2]))~Join~
+(*[1,1,1] 1*)(Act[BasisE[{{1},{2},{3}}],#]&/@(Tensor[{{1}, {2},{3}}, #] & /@WT[{1,1,1},2]));
 
 
 Begin["`Private`"];
+
+
+(BN3M2(*change of coordinate matrix*)=Outer[BraKet,TensorBases[2,3],normalize/@fullbasis])
+
+
+fullbasisN3M3(*U,S \:5206\:584a\:57fa*)=(*[1,1,1] 1*)(Acti[BasisE[{{1},{2},{3}}],#]&/@(Tensor[{{1},{2},{3}}, #] & /@WT[{1,1,1},3]))~Join~
+(*[2,1] 1*)(BlockDiagonalMatrix[{IdentityMatrix[2],{{0,0,1},{0,1,0},{2/3,0,1/3}}(*diagonalization*),IdentityMatrix[3]}] . (Acti[BasisE[t1],#]&/@(Tensor[t1, #] & /@WT[{2,1},3])))~Join~
+(*[2,1] 2*)( BlockDiagonalMatrix[{IdentityMatrix[2],{{-1/3,0,2/3}(*double check w GT!*),{0,1,0},{1,0,0}},IdentityMatrix[3]}] . (Acti[BasisE[t2],#]&/@(Tensor[t2, #] & /@WT[{2,1},3])))~Join~
+(*[3]*)(Acti[BasisE[{{1,2,3}}],#]&/@(Tensor[{{1,2,3}}, #] & /@WT[{3},3]));(*note that the matrix generated this way is not unitary, since the bases are not orthogonal for the e[1,2,3] components]*)
+
+
+(BN3M3(*change of coordinate matrix*)=Outer[BraKet,TensorBases[3,3],normalize/@fullbasisN3M3])
+
+
+(*Generate representation matrix in computational basis*)TensorRepMatrix[n_,Matrix_]:=Nest[TPM[Matrix,#]&,Matrix,n-1]
 
 
 End[];
