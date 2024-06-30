@@ -1,6 +1,6 @@
 (* ::Package:: *)
 
-(*Version 06/20/2024*)
+(*Version 06/23/2024*)
 
 
 BeginPackage["QCFunctions`"];
@@ -70,7 +70,7 @@ getVec[c_,n_]:=ReplacePart[Table[0,2^n],ToExpression[ToExpression["2^^"<>ToStrin
 (*Random D.M. Generation*)
 
 
-random\[Rho][d_]:=Module[{uframe=RandomVariate[GaussianUnitaryMatrixDistribution[d]],mtest},(mtest=uframe . RandomVariate[WishartMatrixDistribution[5,IdentityMatrix[d]]] . uframe);mtest/Tr[mtest]]
+random\[Rho][d_]:=Module[{uframe=RandomVariate[GaussianUnitaryMatrixDistribution[d]],mtest},(mtest=uframe . RandomVariate[WishartMatrixDistribution[d,IdentityMatrix[d]]] . uframe);mtest/Tr[mtest]]
 
 
 (* ::Subsection:: *)

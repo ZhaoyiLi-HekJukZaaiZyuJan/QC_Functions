@@ -1,9 +1,12 @@
 (* ::Package:: *)
 
-(*Version 06/20/2024*)
+(*Version 06/30/2024*)
+
+(*run this to change everything to default format*)
+SetOptions[EvaluationNotebook[], StyleDefinitions -> "Default.nb"]
 
 
-BeginPackage["YoungFunctions`",{"QCFunctions`"}];(*publicly load QCFunctions as well*)
+BeginPackage["YoungFunctions`"];
 
 
 Needs["Combinatorica`"]
@@ -13,33 +16,27 @@ Needs["Combinatorica`"]
 (*Young.nb\:5705\:6570*)
 
 
-(*\:5e8f\:5217*)
-cut[x_]:=x/.{ Max[x]->Nothing}//.{{}->Nothing};
-
-
-(*\:7fa3\:4ee3\:6570\:79ef compsition of permuations, enter two permutations, the order is reversed, i.d. a\[Diamond]b = b\circ a*)
-ReversePermutationProduct[x___]:=Apply[PermutationProduct,Reverse[{x}]];
-Diamond[x___]:=Piecewise[{{System`Cycles[{}],Length@List@x==0},{TensorExpand[TensorProduct[x]],True}}]/.TensorProduct->ReversePermutationProduct
-(*\:5167\:79ef inner product on group algebra, with permutations as orthogonal basis*)
-BraKet[x_,y_]:=TensorExpand[x\[TensorProduct]y]/.TensorProduct->Boole@*SameQ
-SetAttributes[BraKet,{Listable}]
-SetAttributes[Diamond,{Flat,OneIdentity,Flat,Listable,OneIdentity}]
-
+(*\:8f14\:52a9\:5705\:6570*)
 
 Sgn[perm_]:=Apply[Times,(-1)^(Length/@First[perm]-1)]
 Trans[x_]:=Module[{
 l=Max[Length/@x]},
 Transpose[#~Join~Table[0,l-Length[#]]&/@x]/. 0->Nothing]
 
+(*cut: remove the biggest element
+	input: list*)
+cut[x_]:=x/.{Max[x]->Nothing}//.{{}->Nothing};
+series[x_]:=NestList[cut,x,Max[x]];
 
+(*\:5e7c\:5705\:6570*)
 FindPerForList[list_](*generate all elems of a permuattion group*):=Module[{rules=Thread[Rule[Range@Length@list,list]]},FindPermutation[list,#]&/@Permutations[list]/.rules]
 (*Generate all permutations for rows/columns of a young tableaux, entered as a list of listes (rows)*)
 AllPer[YT_]:=Flatten[Outer[PermutationProduct,Sequence@@Map[FindPerForList,YT]]]
 P[YT_]:=Plus@@AllPer[YT]
 Q[YT_]:=Plus@@(Sgn[#]#&/@AllPer[Trans@YT])
-e[YT_](*corresponding to E on notes since E is built-in defined*):=P[YT]\[Diamond]Q[YT]
+(*corresponding to Unormalized Young Projector E on notes since E is built-in defined*)
+e[YT_]:=P[YT]\[Diamond]Q[YT]
 
-(*\:8f6c\:6362*)
 (*toYT[]
 	input form of Young Diagram {lrow,lrow,lrow...}
 	 output all possibly Young Diagrams
@@ -51,27 +48,9 @@ toYT[YD_]:=GroupBy[Tableaux[Total[YD]],Length/@#&][YD]
 toYD[YT_]:=Length/@YT
 \[Theta][YD_]:=Total[YD]!/Length[toYT[YD]]
 y[YT_](*normalized idempotent*):=e[YT]/\[Theta][toYD[YT]]
-series[x_]:=NestList[cut,x,Max[x]];
 
-
-(* ::Section:: *)
-(*\:4f8b Subscript[S, 3]*)
-
-
-mybasis(*using my bases ordering*)={System`Cycles[{}],System`Cycles[{{1,2,3}}],System`Cycles[{{1,3,2}}],System`Cycles[{{1,2}}],System`Cycles[{{1,3}}],System`Cycles[{{2,3}}]};
-components[unit_]:=BraKet[unit ,#]&/@mybasis
-t0={{1,2,3}};
-t1={{1,2},{3}};
-t2={{1,3},{2}};
-t3={{1},{2},{3}};
-
-
-(* ::Subsection:: *)
-(*Action (Coordinate Rep) of Y*)
-
-
-(y[t_](*representation matrix, left multiply*):= Outer[BraKet, mybasis, Y[t]\[Diamond]mybasis])(*generate basis*)
-(yr[t_](*representation matrix, right multiply*):=Outer[BraKet,mybasis,mybasis\[Diamond]Y[t]])(*generate basis*)
+(*Is Indemp \:9a8c\:8bc1\:672c\:5e42*)
+IsIdemp[ele_]:=Simplify[ele\[Diamond]ele==ele]
 
 
 (* ::Chapter:: *)
@@ -79,7 +58,7 @@ t3={{1},{2},{3}};
 
 
 (*BasisE[YT:List[List], n: Int] n take 1 to Total[YD], note this goes backwards
-	gerate the list of basis by diminution of YT, i.e. e^(0), e^(1), e^(2), etc*)
+	gerate the list of basis by diminution of YT, i.e. e^(1), e^(2), e^(3), etc*)
 BasisE[YT_,n_:1]:=Block[{i=0,S=series[YT],e0=System`Cycles[{{}}],nexte},nexte[laste_]:=(++i;1/\[Theta][toYD[S[[-i-1]]]]laste\[Diamond] e[S[[-i-1]]]\[Diamond]laste);Nest[nexte,e0,Length[S]-n]]
 
 (*Find the permutation Subscript[\[Sigma], rs] that links two YT*)Relate[YT1_,YT2_]:=FindPermutation[Flatten[YT2],Flatten[YT1]]/.Thread[Rule[Range[Total[toYD[YT2]]],Flatten[YT2]]]
@@ -141,7 +120,8 @@ Grow[length_,max_,YT_](*Start from a YT, grow bigger by one tow*):=
 (Append[YT,#])&/@NewRows[length,max,LastRow[YT](*last row*)]
 
 Grows[length_,max_,YTs_(*list of YTs*)]:=Flatten[Map[Grow[length,max,#]&,YTs],1]
-WT[YD_,N_]:=SortBy[Fold[Grows[#2,N,#]&,{{}},YD],Reverse@*Flatten](*Weyl Tableaux, ordering is a bit diff from the G-T ordering*)
+
+WT[YD_,N_]:=Fold[Grows[#2,N,#]&,{{}},YD]
 
 
 (* ::Subchapter:: *)
@@ -154,13 +134,16 @@ InversePermute[x___]:=System`Permute[First[{x}],System`InversePermutation@Last[{
 Acti[unit_,basis_](*inverse permute*):=TensorExpand[basis\[TensorProduct]unit]/.TensorProduct->InversePermute
 Act[unit_,basis_]:=TensorExpand[basis\[TensorProduct]unit]/.TensorProduct->System`Permute
 (*get basis from tableau*)
-Tensor[YT_,WT_]:=Apply[e,Permute[Flatten[WT],Flatten[YT]](*ragged transpose!!*)]
+Tensor[Weyl_]:=Apply[e,Flatten[Flatten[Weyl,{{2},{1}}](*ragged transpose!!*)]]
 
 
 repMatrix[unit_]:=Outer[BraKet,TensorBases[2,3],Act[unit,#]&/@TensorBases[2,3]]
 
 
 repComp[vec_](*components*):= BraKet[vec , #] & /@ TensorBases[2, 3]
+
+
+(*Generate representation matrix in computational basis*)TensorRepMatrix[n_,Matrix_]:=Nest[TPM[Matrix,#]&,Matrix,n-1]
 
 
 (* ::Subsection:: *)
@@ -190,10 +173,7 @@ fullbasisN3M2(*U,S \:5206\:584a\:57fa*)=(*[2,1] 1*)((Act[BasisE[t1],#]&/@(Tensor
 (*[1,1,1] 1*)(Act[BasisE[{{1},{2},{3}}],#]&/@(Tensor[{{1}, {2},{3}}, #] & /@WT[{1,1,1},2]));
 
 
-Begin["`Private`"];
-
-
-(BN3M2(*change of coordinate matrix*)=Outer[BraKet,TensorBases[2,3],normalize/@fullbasis])
+(BN3M2(*change of coordinate matrix*)=Outer[BraKet,TensorBases[2,3],normalize/@fullbasisN3M2])
 
 
 fullbasisN3M3(*U,S \:5206\:584a\:57fa*)=(*[1,1,1] 1*)(Acti[BasisE[{{1},{2},{3}}],#]&/@(Tensor[{{1},{2},{3}}, #] & /@WT[{1,1,1},3]))~Join~
@@ -206,6 +186,9 @@ fullbasisN3M3(*U,S \:5206\:584a\:57fa*)=(*[1,1,1] 1*)(Acti[BasisE[{{1},{2},{3}}]
 
 
 (*Generate representation matrix in computational basis*)TensorRepMatrix[n_,Matrix_]:=Nest[TPM[Matrix,#]&,Matrix,n-1]
+
+
+Begin["`Private`"];
 
 
 End[];
